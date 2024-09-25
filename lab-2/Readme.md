@@ -162,3 +162,4 @@ where aircraft_code = 'XYZ';
 -- Результат: DELETE 0
 ```
 
+---
