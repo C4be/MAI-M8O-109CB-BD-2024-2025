@@ -49,7 +49,6 @@ postgres=# \d aircrafts
     *You are now connected to database "demo" as user "postgres".*
 
 2. Рассмотрим структуру `aircrafts`:
-
 ```code
                 View "bookings.aircrafts"
     Column     |     Type     | Collation | Nullable | Default 
@@ -60,13 +59,9 @@ range         | integer      |           |          |
 ``` 
 
 3. Рассмотрим запрос создания вьюшки `aircrafts`, которая служит для того, чтобы быть мультиязыковой:
-
 ![aircrafts](lab2.1.png)
-
 Эта вьюшка создана на основе `aircrafts_data`:
 
 4. Рассмотрим ее 
-
 ![aircrafts_data](lab2.2.png)
-
 Поле `aircraft_code` является сурргогатным первичным ключом, а первичный ключ должен быть уникальным. Пожтому и была ошибка.
