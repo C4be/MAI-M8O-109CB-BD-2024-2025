@@ -161,6 +161,7 @@ INSERT INTO test_serial ( name ) VALUES ( 'Грушевая' );
 ```
 
 На этом шаге мы получили ошибку:
+
 ![alt text](lab3.1.png)
 
 **Это случилось потому что**:
