@@ -189,12 +189,244 @@ edu=# INSERT INTO students VALUES ( 12346, ' ', 0406, 112233 );
 
 ## Упражнение 17
 ### Дано:
+
+Представления могут быть, условно говоря, вертикальными и горизонтальными.
+При создании вертикального представления в список его столбцов включается лишь часть столбцов базовой таблицы (таблиц). Например:
+
+```sql
+CREATE VIEW airports_names AS
+     SELECT airport_code, airport_name, city
+       FROM airports;
+       
+SELECT * FROM airports_names;
+```
+
+В горизонтальное представление включаются не все строки базовой таблицы (таблиц), а производится их отбор с помощью фраз WHERE или HAVING. Например:
+
+```sql
+CREATE VIEW siberian_airports AS
+     SELECT * FROM airports
+      WHERE city = 'Новосибирск' OR city = 'Кемерово';
+
+SELECT * FROM siberian_airports;
+```
+
+
+Конечно, вполне возможен и смешанный вариант, когда ограничивается как список столбцов, так и множество строк при создании представления. Подумайте, какие представления было бы целесообразно создать для нашей базы данных «Авиаперевозки». Необходимо учесть наличие различных групп пользователей, например: пилоты, диспетчеры, пассажиры, кассиры.
+
 ### Решение:
+
+Предлагаю вспомнить структуру наше БД авиаперевозки.
+
+```bash
+demo=# \d
+                   List of relations
+  Schema  |         Name          |   Type   |  Owner   
+----------+-----------------------+----------+----------
+ bookings | aircrafts             | view     | postgres
+ bookings | aircrafts_data        | table    | postgres
+ bookings | airports              | view     | postgres
+ bookings | airports_data         | table    | postgres
+ bookings | boarding_passes       | table    | postgres
+ bookings | bookings              | table    | postgres
+ bookings | flights               | table    | postgres
+ bookings | flights_flight_id_seq | sequence | postgres
+ bookings | flights_v             | view     | postgres
+ bookings | routes                | view     | postgres
+ bookings | seats                 | table    | postgres
+ bookings | ticket_flights        | table    | postgres
+ bookings | tickets               | table    | postgres
+(13 rows)
+```
+
+У нас в ней есть уже 3 вьюшки, которые слушат для мультиязычности таблицы. Можно еще создать следующие вьюшки: 
+
+- посчитать количество перелетов определенной продолжительности из таблицы `routes`
+- узнать какие аэропорта начинаются с гласной.
+
+Кол-во перелетов определенной продолжительности:
+
+```sql
+create view w_durations as
+select distinct 
+    duration,    
+    count(*) over(partition by duration) as count
+
+from routes;
+
+select * from w_durations;
+```
+
+```bash
+duration | count 
+----------+-------
+ 00:25:00 |    24
+ 00:30:00 |    22
+ 00:35:00 |    10
+ 00:40:00 |     2
+ 00:45:00 |     8
+ 00:50:00 |    26
+ 00:55:00 |    26
+ 01:00:00 |    14
+ 01:05:00 |    18
+ 01:10:00 |     8
+ 01:15:00 |    20
+ 01:20:00 |    10
+ 01:25:00 |    22
+ 01:30:00 |    16
+ 01:35:00 |     4
+ 01:40:00 |    10
+ 01:45:00 |    26
+ 01:50:00 |    18
+ 01:55:00 |    18
+...
+```
+
+```sql
+create view w_beda as
+    select airport_name
+    from airports
+    where lower(trim(substring(airport_name for 1))) in ('а', 'у', 'ы', 'я', 'и', 'е', 'о', 'ю', 'э')
+    order by airport_name;
+
+select * from w_beda;
+```
+
+```bash
+demo=# 
+select * from w_beda;
+CREATE VIEW
+     airport_name     
+----------------------
+ Абакан
+ Анадырь
+ Астрахань
+ Елизово
+ Емельяново
+ Иваново-Южный
+ Игнатьево
+ Ижевск
+ Иркутск
+ Омск-Центральный
+ Оренбург-Центральный
+ Орск
+ Уйташ
+ Ульяновск-Восточный
+ Усинск
+ Усть-Илимск
+ Усть-Кут
+ Уфа
+ Ухта
+ Элиста
+ Якутск
+(21 rows)
+
+```
 
 ---
 
 ## Упражнение 18
-### Дано:
+### Дано: Добавить технические характеристики самолетов.
+
 ### Решение:
+
+Добавим новый столбец в таблицу «Самолеты» (aircrafts). Дадим ему имя specifications, а в качестве типа данных выберем jsonb. Если впоследствии потребуется добавить и другие характеристики,
+то мы сможем это сделать, не модифицируя определение таблицы.
+
+```sql
+ALTER TABLE aircrafts ADD COLUMN specifications jsonb;
+```
+
+Добавим сведения для модели самолета Airbus A320-200:
+
+```sql
+UPDATE aircrafts
+SET specifications =
+'{ "crew": 2,
+    "engines": 
+            { 
+                "type": "IAE V2500",
+                "num": 2
+            }
+}'::jsonb
+WHERE aircraft_code = '320';
+```
+
+Посмотрим, что получилось:
+
+```sql
+SELECT model, specifications
+FROM aircrafts
+WHERE aircraft_code = '320';
+```
+
+```bash
+       model     |             specifications
+-----------------+-------------------------------------------
+ Airbus A320-200 | {"crew": 2, "engines": {"num": 2, "type":
+                   "IAE V2500"}}
+(1 строка)
+```
+
+Посмотрим только сведения о двигателях:
+
+```sql
+SELECT model, specifications->'engines' AS engines
+FROM aircrafts
+WHERE aircraft_code = '320';
+```
+
+```bash
+      model      |          engines
+-----------------+---------------------------------
+ Airbus A320-200 | {"num": 2, "type": "IAE V2500"}
+(1 строка)
+```
+
+Посмотрим информацию во вложенном `jsonb`:
+
+```sql
+SELECT model, specifications #> '{ engines, type }'
+FROM aircrafts
+WHERE aircraft_code = '320';
+```
+
+```bash
+      model      | ?column?
+-----------------+-------------
+ Airbus A320-200 | "IAE V2500"
+(1 строка)
+```
+
+Чтобы добавить новый атрибут для хранения списка предоставляемой еды в формате JSONB в таблице seats, можно использовать следующий SQL-запрос:
+
+```sql
+ALTER TABLE bookings.seats
+ADD COLUMN meals jsonb;
+```
+
+Чтобы добавить список еды для определенного места, можно выполнить такой запрос:
+
+```sql
+UPDATE bookings.seats
+SET meals = '{ 
+                "завтрак": "первое",
+                "обед": "чай"
+             }'::jsonb
+WHERE aircraft_code = '319' AND seat_no = '2C';
+```
+
+Получаем:
+
+```bash
+demo=# select * from seats where aircraft_code = '319' and meals is not null;
+ aircraft_code | seat_no | fare_conditions |                meals                 
+---------------+---------+-----------------+--------------------------------------
+ 319           | 2C      | Business        | {"обед": "чай", "завтрак": "первое"}
+(1 row)
+```
+
+
+
 
 ---
