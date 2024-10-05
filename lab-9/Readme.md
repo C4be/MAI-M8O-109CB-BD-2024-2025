@@ -224,4 +224,206 @@ SELECT  a.aircraft_code AS a_code,
 
 ### Решение:
 
+Выполним два запроса и получим определенные результаты:
+
+Первый
+```bash
+                                                                                                                                 QUERY PLAN                                                                                                                                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=23668.18..23668.20 rows=9 width=56) (actual time=195.800..195.803 rows=9 loops=1)
+   Sort Key: ((SubPlan 1)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   ->  Group  (cost=1.75..23668.03 rows=9 width=56) (actual time=24.141..195.785 rows=9 loops=1)
+         Group Key: ml.aircraft_code, ((ml.model ->> lang()))
+         ->  Incremental Sort  (cost=1.75..14.95 rows=9 width=48) (actual time=0.133..0.136 rows=9 loops=1)
+               Sort Key: ml.aircraft_code, ((ml.model ->> lang()))
+               Presorted Key: ml.aircraft_code
+               Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 25kB  Peak Memory: 25kB
+               ->  Index Scan using aircrafts_pkey on aircrafts_data ml  (cost=0.14..14.54 rows=9 width=48) (actual time=0.062..0.108 rows=9 loops=1)
+         SubPlan 1
+           ->  Aggregate  (cost=2627.85..2627.86 rows=1 width=8) (actual time=21.735..21.735 rows=1 loops=9)
+                 ->  Hash Join  (cost=2239.20..2625.50 rows=188 width=240) (actual time=20.227..21.729 rows=79 loops=9)
+                       Hash Cond: (flights.arrival_airport = ml_2.airport_code)
+                       ->  Hash Join  (cost=2233.86..2619.19 rows=361 width=8) (actual time=20.214..21.699 rows=79 loops=9)
+                             Hash Cond: (flights.departure_airport = ml_1.airport_code)
+                             ->  GroupAggregate  (cost=2228.52..2605.05 rows=695 width=67) (actual time=20.203..21.672 rows=79 loops=9)
+                                   Group Key: flights.flight_no, flights.departure_airport, flights.arrival_airport, flights.aircraft_code, ((flights.scheduled_arrival - flights.scheduled_departure))
+                                   ->  Group  (cost=2228.52..2441.68 rows=6952 width=39) (actual time=20.187..21.589 rows=422 loops=9)
+                                         Group Key: flights.flight_no, flights.departure_airport, flights.arrival_airport, flights.aircraft_code, ((flights.scheduled_arrival - flights.scheduled_departure)), ((to_char(flights.scheduled_departure, 'ID'::text))::integer)
+                                         ->  Sort  (cost=2228.52..2249.04 rows=8208 width=39) (actual time=20.155..20.416 rows=7296 loops=9)
+                                               Sort Key: flights.flight_no, flights.departure_airport, flights.arrival_airport, ((flights.scheduled_arrival - flights.scheduled_departure)), ((to_char(flights.scheduled_departure, 'ID'::text))::integer)
+                                               Sort Method: quicksort  Memory: 2218kB
+                                               ->  Seq Scan on flights  (cost=0.00..1694.88 rows=8208 width=39) (actual time=1.455..10.761 rows=7296 loops=9)
+                                                     Filter: (aircraft_code = ml.aircraft_code)
+                                                     Rows Removed by Filter: 58368
+                             ->  Hash  (cost=4.04..4.04 rows=104 width=4) (actual time=0.078..0.079 rows=104 loops=1)
+                                   Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                   ->  Seq Scan on airports_data ml_1  (cost=0.00..4.04 rows=104 width=4) (actual time=0.005..0.036 rows=104 loops=1)
+                       ->  Hash  (cost=4.04..4.04 rows=104 width=4) (actual time=0.101..0.101 rows=104 loops=1)
+                             Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                             ->  Seq Scan on airports_data ml_2  (cost=0.00..4.04 rows=104 width=4) (actual time=0.014..0.048 rows=104 loops=1)
+ Planning Time: 1.116 ms
+ Execution Time: 196.025 ms
+(34 rows)
+```
+
+Второй
+```bash
+                                                                                                                                    QUERY PLAN                                                                                                                                     
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=5258.58..5258.60 rows=9 width=56) (actual time=65.781..65.784 rows=9 loops=1)
+   Sort Key: (count(flights.aircraft_code)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   ->  GroupAggregate  (cost=5255.85..5258.43 rows=9 width=56) (actual time=65.672..65.773 rows=9 loops=1)
+         Group Key: ml.aircraft_code, ((ml.model ->> lang()))
+         ->  Sort  (cost=5255.85..5255.91 rows=22 width=52) (actual time=65.660..65.686 rows=711 loops=1)
+               Sort Key: ml.aircraft_code, ((ml.model ->> lang()))
+               Sort Method: quicksort  Memory: 80kB
+               ->  Hash Right Join  (cost=4746.77..5255.36 rows=22 width=52) (actual time=63.236..65.471 rows=711 loops=1)
+                     Hash Cond: (flights.aircraft_code = ml.aircraft_code)
+                     ->  Hash Join  (cost=4745.57..5242.39 rows=490 width=240) (actual time=63.167..64.515 rows=710 loops=1)
+                           Hash Cond: (flights.arrival_airport = ml_2.airport_code)
+                           ->  Hash Join  (cost=4740.23..5234.52 rows=943 width=8) (actual time=63.074..64.260 rows=710 loops=1)
+                                 Hash Cond: (flights.departure_airport = ml_1.airport_code)
+                                 ->  GroupAggregate  (cost=4734.89..5206.19 rows=1813 width=67) (actual time=62.991..64.022 rows=710 loops=1)
+                                       Group Key: flights.flight_no, flights.departure_airport, flights.arrival_airport, flights.aircraft_code, ((flights.scheduled_arrival - flights.scheduled_departure))
+                                       ->  Sort  (cost=4734.89..4780.21 rows=18127 width=39) (actual time=62.985..63.160 rows=3798 loops=1)
+                                             Sort Key: flights.flight_no, flights.departure_airport, flights.arrival_airport, flights.aircraft_code, ((flights.scheduled_arrival - flights.scheduled_departure)), ((to_char(flights.scheduled_departure, 'ID'::text))::integer)
+                                             Sort Method: quicksort  Memory: 423kB
+                                             ->  HashAggregate  (cost=3090.24..3452.78 rows=18127 width=39) (actual time=54.227..54.901 rows=3798 loops=1)
+                                                   Group Key: flights.flight_no, flights.departure_airport, flights.arrival_airport, flights.aircraft_code, (flights.scheduled_arrival - flights.scheduled_departure), (to_char(flights.scheduled_departure, 'ID'::text))::integer
+                                                   Batches: 1  Memory Usage: 1297kB
+                                                   ->  Seq Scan on flights  (cost=0.00..2105.28 rows=65664 width=39) (actual time=0.021..28.068 rows=65664 loops=1)
+                                 ->  Hash  (cost=4.04..4.04 rows=104 width=4) (actual time=0.076..0.077 rows=104 loops=1)
+                                       Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                       ->  Seq Scan on airports_data ml_1  (cost=0.00..4.04 rows=104 width=4) (actual time=0.004..0.034 rows=104 loops=1)
+                           ->  Hash  (cost=4.04..4.04 rows=104 width=4) (actual time=0.086..0.086 rows=104 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                 ->  Seq Scan on airports_data ml_2  (cost=0.00..4.04 rows=104 width=4) (actual time=0.008..0.043 rows=104 loops=1)
+                     ->  Hash  (cost=1.09..1.09 rows=9 width=48) (actual time=0.032..0.033 rows=9 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                           ->  Seq Scan on aircrafts_data ml  (cost=0.00..1.09 rows=9 width=48) (actual time=0.018..0.023 rows=9 loops=1)
+ Planning Time: 0.878 ms
+ Execution Time: 66.098 ms
+(34 rows)
+```
+
+Как видно время исполнения первого запроса $\approx 196 ms$, а для второо запроса $\approx 66 ms$.
+
+По планам выполнения обоих запросов можно увидеть ключевые строки, которые демонстрируют, почему второй запрос более эффективен. Рассмотрим это на конкретных строках планов.
+
+Первый запрос
+1. **SubPlan 1 (подзапрос)**:
+   ```
+   SubPlan 1
+   ->  Aggregate  (cost=2627.85..2627.86 rows=1 width=8) (actual time=21.735..21.735 rows=1 loops=9)
+   ```
+   - Здесь указано, что подзапрос выполняется **9 раз** (по одному разу для каждого самолёта). Время выполнения одного подзапроса — **21.735 мс**, что при 9 повторениях даёт значительное время выполнения.
+   
+2. **Seq Scan on flights (поиск маршрутов для каждого самолёта)**:
+   ```
+   ->  Seq Scan on flights  (cost=0.00..1694.88 rows=8208 width=39) (actual time=1.455..10.761 rows=7296 loops=9)
+   ```
+   - Полный последовательный скан таблицы `flights` выполняется **9 раз**, так как подзапрос выполняется для каждого самолёта. Время выполнения одного сканирования — **1.455..10.761 мс**, что суммируется при 9 повторениях.
+   - В этом заключается ключевая неэффективность — многократный проход по данным.
+
+Второй запрос
+1. **Hash Right Join (соединение aircrafts с routes)**:
+   ```
+   ->  Hash Right Join  (cost=4746.77..5255.36 rows=22 width=52) (actual time=63.236..65.471 rows=711 loops=1)
+   ```
+   - Соединение таблиц `aircrafts` и `routes` выполняется **один раз**, и результат передаётся дальше в агрегатную функцию. Это ключевое преимущество, так как здесь база данных сразу собирает все данные для всех самолётов, не повторяя операции.
+   
+2. **Seq Scan on flights (последовательный скан маршрутов)**:
+   ```
+   ->  Seq Scan on flights  (cost=0.00..2105.28 rows=65664 width=39) (actual time=0.021..28.068 rows=65664 loops=1)
+   ```
+   - В отличие от первого запроса, здесь последовательное сканирование таблицы `flights` выполняется **один раз** (вместо 9 раз), что значительно снижает количество операций и ускоряет выполнение запроса.
+
+
+**Аналогичные примеры:**
+
+Поиска кол-ва мест, для всех самолетов:
+
+```sql
+select 
+      count(arc.model),
+      ss.fare_conditions
+  from aircrafts arc
+  
+  left
+  join seats ss
+    on arc.aircraft_code = ss.aircraft_code
+ where ss.fare_condition in ('Comfort', 'Economy')
+ group by ss.fare_conditions;
+```
+
+
+План:
+
+```bash
+demo=# 
+EXPLAIN ANALYZE select 
+      count(arc.model),
+      ss.fare_conditions
+  from aircrafts arc
+  
+  left
+  join seats ss
+    on arc.aircraft_code = ss.aircraft_code
+ where ss.fare_conditions in ('Comfort', 'Economy')
+ group by ss.fare_conditions;
+                                                          QUERY PLAN                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=336.18..336.21 rows=3 width=16) (actual time=5.895..5.897 rows=2 loops=1)
+   Group Key: ss.fare_conditions
+   Batches: 1  Memory Usage: 24kB
+   ->  Hash Join  (cost=1.20..30.52 rows=1187 width=40) (actual time=0.073..1.516 rows=1188 loops=1)
+         Hash Cond: (ss.aircraft_code = ml.aircraft_code)
+         ->  Seq Scan on seats ss  (cost=0.00..24.74 rows=1187 width=12) (actual time=0.036..0.728 rows=1188 loops=1)
+               Filter: ((fare_conditions)::text = ANY ('{Comfort,Economy}'::text[]))
+               Rows Removed by Filter: 151
+         ->  Hash  (cost=1.09..1.09 rows=9 width=48) (actual time=0.022..0.023 rows=9 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  Seq Scan on aircrafts_data ml  (cost=0.00..1.09 rows=9 width=48) (actual time=0.008..0.012 rows=9 loops=1)
+ Planning Time: 0.366 ms
+ Execution Time: 5.963 ms
+(13 rows)
+```
+
+Запрос 2:
+
+```sql
+with wt_tt as (SELECT 
+    (SELECT arc.model 
+     FROM aircrafts arc
+     WHERE arc.aircraft_code = ss.aircraft_code) AS model_count,
+    ss.fare_conditions
+FROM seats ss
+WHERE ss.fare_conditions IN ('Comfort', 'Economy'))
+select count(wt_tt.model_count), wt_tt.fare_conditions from wt_tt
+group by wt_tt.fare_conditions;
+
+```
+
+План:
+
+```bash
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=1650.93..1650.96 rows=3 width=16) (actual time=8.307..8.309 rows=2 loops=1)
+   Group Key: ss.fare_conditions
+   Batches: 1  Memory Usage: 24kB
+   ->  Seq Scan on seats ss  (cost=0.00..24.74 rows=1187 width=12) (actual time=0.036..0.482 rows=1188 loops=1)
+         Filter: ((fare_conditions)::text = ANY ('{Comfort,Economy}'::text[]))
+         Rows Removed by Filter: 151
+   SubPlan 1
+     ->  Seq Scan on aircrafts_data ml  (cost=0.00..1.36 rows=1 width=32) (actual time=0.004..0.005 rows=1 loops=1188)
+           Filter: (aircraft_code = ss.aircraft_code)
+           Rows Removed by Filter: 8
+ Planning Time: 0.354 ms
+ Execution Time: 8.371 ms
+(12 rows)
+```
+
 ---
